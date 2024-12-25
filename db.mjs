@@ -131,7 +131,7 @@ export async function queryById(id, day, cb) {
         ${getTableNameByDay(day)}
     where
         sip_call_id = '${id}'
-    order by create_time
+    order by create_time, timestamp_micro ASC 
     `
 
     logger.info(sql)
