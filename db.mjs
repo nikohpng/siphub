@@ -128,10 +128,10 @@ export async function queryById(id, day, cb) {
     response_desc,
     length(raw_msg) as msg_len
     from
-        records 
+        ${getTableNameByDay(day)}
     where
         sip_call_id = '${id}'
-    order by create_time , timestamp_micro 
+    order by create_time
     `
 
     logger.info(sql)
