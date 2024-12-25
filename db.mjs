@@ -74,10 +74,10 @@ export async function queryRecord(c, cb) {
     const sql = `
       select
         sip_call_id as "CallID",
-        date_format(min(create_time),'HH24:MI:SS') as "startTime",
-        date_format(min(create_time),'YYYY-MM-DD') as "day",
-        date_format(max(create_time),'HH24:MI:SS') as "stopTime",
-        date_format(max(create_time) - min(create_time),'HH24:MI:SS') as "duration",
+        date_format(min(create_time),'%H:%i:%s') as "startTime",
+        date_format(min(create_time),'%Y-%m-%d') as "day",
+        date_format(max(create_time),'%H:%i:%s') as "stopTime",
+        date_format(max(create_time) - min(create_time),'%H:%i:%s') as "duration",
         min(from_user) as "caller",
         min(to_user) as "callee",
         count(*) as "msgTotal",
