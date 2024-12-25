@@ -7,18 +7,19 @@ import { createSeqHtml } from "../util.mjs"
 export const route = Router()
 
 route.post('/record', async (req, res) => {
-    let re = await queryRecord(req.body)
-    res.render('home/sipcdr', { table: re.rows })
+    await queryRecord(req.body, function (re) {
+        res.render('home/sipcdr', { table: re})
+    })
 })
 
 route.get('/call', async (req, res) => {
-    let re = await queryById(req.query.id, req.query.day)
-    let rows = re.rows
-    let seq = createSeqHtml(rows)
-    logger.debug(seq)
+    await queryById(req.query.id, req.query.day, function (rows) {
+        let seq = createSeqHtml(rows)
+        logger.debug(seq)
 
-    res.render('diagram/index', {
-        seq: seq.html, table: rows
+        res.render('diagram/index', {
+            seq: seq.html, table: rows
+        })
     })
 })
 

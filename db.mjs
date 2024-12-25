@@ -1,20 +1,28 @@
-import pg from 'pg'
+// import pg from 'pg'
+import mysql from 'mysql'
 import { AppEnv } from './env.mjs'
 import { logger } from './logger.mjs'
 import { whereBuilder } from './util.mjs'
-const { Client, Pool } = pg
 import dayjs from 'dayjs'
 
-const pool = new Pool({
-    user: AppEnv.DBUser,
-    password: AppEnv.DBPasswd,
-    host: AppEnv.DBAddr,
-    port: AppEnv.DBPort,
-    database: AppEnv.DBName,
-    idleTimeoutMillis: 30000,
-    max: 20,
-    connectionTimeoutMillis: 2000,
-})
+// const pool = new Pool({
+//     user: AppEnv.DBUser,
+//     password: AppEnv.DBPasswd,
+//     host: AppEnv.DBAddr,
+//     port: AppEnv.DBPort,
+//     database: AppEnv.DBName,
+//     idleTimeoutMillis: 30000,
+//     max: 20,
+//     connectionTimeoutMillis: 2000,
+// })
+
+const pool = mysql.createConnection({
+        host: AppEnv.DBAddr,
+        user: AppEnv.DBUser,
+        password: AppEnv.DBPasswd,
+        database: AppEnv.DBName
+    })
+pool.connect();
 
 function getTableNameByDay(day) {
     let today = dayjs().format('YYYY-MM-DD')
@@ -36,7 +44,7 @@ export async function tableSplit() {
 
     logger.info(sql)
 
-    return await pool.query(sql)
+    pool.query(sql)
 }
 
 export async function deleteTable() {
@@ -60,24 +68,24 @@ export async function deleteTable() {
     }
 }
 
-export async function queryRecord(c) {
+export async function queryRecord(c, cb) {
     logger.info(c)
     let wh = whereBuilder(c)
     const sql = `
       select
         sip_call_id as "CallID",
-        to_char(min(create_time),'HH24:MI:SS') as "startTime",
-        to_char(min(create_time),'YYYY-MM-DD') as "day",
-        to_char(max(create_time),'HH24:MI:SS') as "stopTime",
-        to_char(max(create_time) - min(create_time),'HH24:MI:SS') as "duration",
+        date_format(min(create_time),'HH24:MI:SS') as "startTime",
+        date_format(min(create_time),'YYYY-MM-DD') as "day",
+        date_format(max(create_time),'HH24:MI:SS') as "stopTime",
+        date_format(max(create_time) - min(create_time),'HH24:MI:SS') as "duration",
         min(from_user) as "caller",
         min(to_user) as "callee",
-        count(*)::int as "msgTotal",
+        count(*) as "msgTotal",
         min(user_agent) as "UA",
-        max(response_code)::int as "finalCode",
-        string_agg(DISTINCT CASE WHEN response_code BETWEEN 170 AND 190 THEN response_code::text END, ',') AS "tempCode"
+        max(response_code) as "finalCode",
+        GROUP_CONCAT(DISTINCT CASE WHEN response_code BETWEEN 170 AND 190 THEN response_code END, ',') AS "tempCode"
     from
-        public.${getTableNameByDay(c.day)}
+        ${getTableNameByDay(c.day)}
     where
         ${wh.join(' and ')}
     group by sip_call_id 
@@ -87,19 +95,24 @@ export async function queryRecord(c) {
     `
 
     logger.info(sql)
-    const res = await pool.query(sql)
-
-    return res
+    await pool.query(sql, function (err, rs) {
+        if (err) {
+            logger.error(`query err: ${err}`)
+            cb([])
+            return
+        }
+        cb(rs)
+    })
 }
 
 
-export async function queryById(id, day) {
+export async function queryById(id, day, cb) {
     const sql = `
     select
     sip_call_id,
 	sip_method,
-	to_char(create_time,
-	'YYYY-MM-DD HH24:MI:SS') as create_time,
+	date_format(create_time,
+	'%Y-%M-%d') as create_time,
 	timestamp_micro,
 	raw_msg,
     cseq_number,
@@ -115,14 +128,19 @@ export async function queryById(id, day) {
     response_desc,
     length(raw_msg) as msg_len
     from
-        public.${getTableNameByDay(day)}
+        records 
     where
         sip_call_id = '${id}'
     order by create_time , timestamp_micro 
     `
 
     logger.info(sql)
-    const res = await pool.query(sql)
-
-    return res
+    await pool.query(sql, function (err, rs) {
+        if (err) {
+            logger.error(`query err: ${err}`)
+            cb(null)
+            return
+        }
+        cb(rs)
+    })
 }
